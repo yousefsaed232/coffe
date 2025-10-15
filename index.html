@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="ar">
+  <head>
+    <meta charset="utf-8" />
+    <title>خريطة مزارع البن — تفاعلي وفخم</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --brown-900: #4e342e;
+        --brown-700: #6f4e37;
+        --beige: #fff7f0;
+        --accent: #c48b5b;
+        --light-brown: #a1887f;
+      }
+      html,
+      body,
+      #map {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        font-family: "Cairo", sans-serif;
+        direction: rtl;
+      }
+      body {
+        background: linear-gradient(135deg, #f7ede2 0%, #efe1cc 100%);
+        color: var(--brown-900);
+      }
+      #sidebar {
+        position: absolute;
+        left: 12px;
+        top: 12px;
+        width: 320px;
+        background: rgba(255, 255, 255, 0.98);
+        border-radius: 12px;
+        padding: 16px;
+        z-index: 1100;
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+        backdrop-filter: blur(4px);
+        transition: transform 0.3s ease;
+      }
+      #sidebar.collapsed {
+        transform: translateX(-300px);
+      }
+      #sidebar h1 {
+        margin: 0 0 8px 0;
+        font-size: 20px;
+        color: var(--brown-900);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      #sidebar p {
+        margin: 8px 0 14px 0;
+        font-size: 14px;
+        color: #5b4035;
+        line-height: 1.5;
+      }
+      .group {
+        margin-bottom: 14px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        padding-bottom: 14px;
+      }
+      .group:last-child {
+        border-bottom: none;
+      }
+      .btn {
+        display: block;
+        width: 100%;
+        border: none;
+        background: var(--brown-700);
+        color: #fff;
+        padding: 10px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        margin-bottom: 8px;
+        transition: transform 0.15s ease, background 0.15s ease,
+          box-shadow 0.15s ease;
+        font-family: "Cairo", sans-serif;
+      }
+      .btn:hover {
+        transform: translateY(-3px);
+        background: var(--accent);
+        box-shadow: 0 4px 12px rgba(196, 139, 91, 0.3);
+      }
+      .btn.active {
+        background: var(--accent);
+        box-shadow: 0 0 0 2px rgba(196, 139, 91, 0.3);
+      }
+      .small-btn {
+        background: #fff;
+        color: var(--brown-900);
+        border: 1px solid #eee;
+        padding: 8px 12px;
+        font-size: 13px;
+        display: inline-block;
+        width: auto;
+        margin-right: 8px;
+        margin-bottom: 8px;
+      }
+      .label {
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: #4b322b;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      #descBox {
+        margin-top: 10px;
+        background: linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.95),
+          rgba(255, 250, 245, 0.95)
+        );
+        border-radius: 8px;
+        padding: 12px;
+        font-size: 14px;
+        color: #5a3f35;
+        min-height: 60px;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+        line-height: 1.6;
+      }
+      #map {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1;
+      }
+      .popup-card {
+        width: 320px;
+        text-align: right;
+        direction: rtl;
+        font-family: "Cairo", sans-serif;
+      }
+      .popup-card img {
+        width: 100%;
+        height: 160px;
+        object-fit: cover;
+        border-radius: 8px;
+        display: block;
+        margin-bottom: 10px;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+        transform-origin: center;
+        animation: popIn 0.25s ease;
+      }
+      .popup-title {
+        font-weight: 700;
+        font-size: 18px;
+        color: var(--brown-900);
+        margin-bottom: 8px;
+      }
+      .popup-sub {
+        color: #795548;
+        font-size: 14px;
+        margin-bottom: 10px;
+        line-height: 1.5;
+      }
+      .progress-wrap {
+        background: #efebe9;
+        border-radius: 8px;
+        padding: 8px;
+        margin-bottom: 10px;
+      }
+      .progress-label {
+        font-size: 13px;
+        color: #5b4035;
+        margin-bottom: 8px;
+      }
+      .progress-bar {
+        width: 100%;
+        height: 12px;
+        background: #fff;
+        border-radius: 6px;
+        overflow: hidden;
+        box-shadow: inset 0 1px 0 rgba(0, 0, 0, 0.05);
+      }
+      .progress-fill {
+        width: 0%;
+        height: 100%;
+        background: linear-gradient(90deg, #c48b5b, #6f4e37);
+        transition: width 1100ms cubic-bezier(0.2, 0.9, 0.2, 1);
+      }
+      .bouncy {
+        animation: bounceIn 0.6s cubic-bezier(0.2, 0.9, 0.2, 1);
+      }
+      @keyframes bounceIn {
+        0% {
+          transform: translateY(-20px) scale(0.9);
+          opacity: 0;
+        }
+        60% {
+          transform: translateY(6px) scale(1.04);
+          opacity: 1;
+        }
+        100% {
+          transform: translateY(0) scale(1);
+        }
+      }
+      @keyframes popIn {
+        from {
+          transform: scale(0.98) translateY(6px);
+          opacity: 0;
+        }
+        to {
+          transform: scale(1) translateY(0);
+          opacity: 1;
+        }
+      }
+      #searchBox {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        font-size: 14px;
+        margin-bottom: 12px;
+        font-family: "Cairo", sans-serif;
+        direction: rtl;
+        box-sizing: border-box;
+      }
+      #statsPanel {
+        background: rgba(255, 255, 255, 0.9);
+        border-radius: 8px;
+        padding: 12px;
+        margin-top: 10px;
+        display: none;
+      }
+      .stat-item {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 6px;
+        font-size: 13px;
+      }
+      .comparison-panel {
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 12px;
+        padding: 16px;
+        width: 300px;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        z-index: 1000;
+        display: none;
+      }
+      .comparison-header {
+        font-weight: 700;
+        margin-bottom: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .close-btn {
+        background: none;
+        border: none;
+        font-size: 18px;
+        cursor: pointer;
+        color: var(--brown-700);
+      }
+      .comparison-item {
+        margin-bottom: 10px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #eee;
+      }
+      .buy-btn {
+        display: block;
+        width: 100%;
+        background: var(--accent);
+        color: white;
+        border: none;
+        padding: 10px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-family: "Cairo", sans-serif;
+        font-weight: 600;
+        margin-top: 10px;
+        transition: background 0.2s;
+      }
+      .buy-btn:hover {
+        background: var(--brown-700);
+      }
+      .loader {
+        display: none;
+        text-align: center;
+        padding: 10px;
+        color: var(--brown-700);
+      }
+      .loader-spinner {
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid var(--accent);
+        border-radius: 50%;
+        width: 24px;
+        height: 24px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 8px;
+      }
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+      .toggle-sidebar {
+        position: absolute;
+        right: -40px;
+        top: 16px;
+        background: var(--brown-700);
+        color: white;
+        border: none;
+        border-radius: 0 8px 8px 0;
+        width: 40px;
+        height: 40px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+      }
+      @media (max-width: 780px) {
+        #sidebar {
+          left: 8px;
+          top: 8px;
+          width: 280px;
+          padding: 12px;
+        }
+        .popup-card {
+          width: 280px;
+        }
+        .comparison-panel {
+          width: 90%;
+          right: 5%;
+          bottom: 10px;
+        }
+        .toggle-sidebar {
+          right: -35px;
+          width: 35px;
+          height: 35px;
+        }
+      }
+      @media (max-width: 480px) {
+        #sidebar {
+          width: 90vw;
+          left: 5vw;
+        }
+        .toggle-sidebar {
+          right: -30px;
+          width: 30px;
+          height: 30px;
+          font-size: 16px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="sidebar" aria-label="Sidebar">
+      <button class="toggle-sidebar" id="toggleSidebar">☰</button>
+      <h1>☕ خريطة مزارع البن</h1>
+      <p>استكشف القارات/القِطع وأنواع الخرائط — اضغط على قارة لعرض المزارع</p>
+
+      <div class="group">
+        <div class="label">🔍 البحث</div>
+        <input
+          type="text"
+          id="searchBox"
+          placeholder="ابحث عن مزرعة أو منطقة..."
+        />
+      </div>
+      <div class="group">
+        <div class="label">🌍 القارات</div>
+        <div id="continentButtons"></div>
+      </div>
+      <div class="group">
+        <div class="label">🗺️ أنواع الخرائط</div>
+        <div id="basemapButtons"></div>
+      </div>
+      <div class="group">
+        <div class="label">📊 إحصائيات سريعة</div>
+        <div id="statsPanel">
+          <div class="stat-item">
+            <span>إجمالي المزارع:</span>
+            <span id="totalFarms">0</span>
+          </div>
+          <div class="stat-item">
+            <span>أعلى إنتاج:</span>
+            <span id="topProducer">-</span>
+          </div>
+          <div class="stat-item">
+            <span>متوسط الإنتاج:</span>
+            <span id="avgProduction">0%</span>
+          </div>
+        </div>
+      </div>
+      <div class="group">
+        <div class="label">ℹ️ معلومات</div>
+        <div id="descBox">اختر قارة أو نقطة لعرض معلومات مفصلة.</div>
+      </div>
+      <div class="loader" id="loader">
+        <div class="loader-spinner"></div>
+        جاري التحميل...
+      </div>
+      <div class="group">
+        <button id="resetBtn" class="small-btn">🔄 إعادة ضبط العرض</button>
+        <button id="compareBtn" class="small-btn">⚖️ مقارنة المزارع</button>
+        <button id="statsBtn" class="small-btn">📈 عرض الإحصائيات</button>
+      </div>
+    </div>
+    <div id="map"></div>
+    <div class="comparison-panel" id="comparisonPanel">
+      <div class="comparison-header">
+        <span>مقارنة المزارع</span>
+        <button class="close-btn" id="closeComparison">✕</button>
+      </div>
+      <div id="comparisonContent"></div>
+    </div>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+      const coffeeLocations = [
+        {
+          id: "sa_fayfa",
+          country: "السعودية",
+          region: "جازان — فيفاء",
+          lat: 17.2473,
+          lon: 43.1069,
+          continent: "آسيا",
+          image:
+            "https://images.unsplash.com/photo-1501004318641-b39e6451bec6?q=80&w=1400&auto=format&fit=crop&ixlib=rb-4.0.3&s=7a6d6b9fd0a9d7b4f7c7d35e2f5a2e5a",
+          production_pct: 0.1,
+          phone: "phone:00966",
+          description:
+            "قهوة فيفاء السعودية تشتهر بنكهتها المميزة وزراعتها في المرتفعات الجبلية بمنطقة جازان.",
+          buy_link: "https://example.com/coffee/saudi-fayfa",
+          video_link: "https://www.youtube.com/embed/mNAVcYSm-1U",
+        },
+        {
+          id: "ye_haraz",
+          country: "اليمن",
+          region: "جبل حراز",
+          lat: 15.39,
+          lon: 43.62,
+          continent: "آسيا",
+          image:
+            "https://images.unsplash.com/photo-1517685352821-92cf88aee5a5?q=80&w=1400&auto=format&fit=crop&ixlib=rb-4.0.3&s=2e6f7f6c9b1c1a5f7c2b1a6a3e2f3b4a",
+          production_pct: 0.7,
+          phone: "phone:00967",
+          description:
+            "قهوة يمنية أصيلة من جبل حراز، تتميز بنكهة قوية وتاريخ عريق في زراعة البن.",
+          buy_link: "https://example.com/coffee/yemen-haraz",
+          video_link: "https://www.youtube.com/embed/I77xlRQxwcE",
+        },
+        {
+          id: "et_yirg",
+          country: "إثيوبيا",
+          region: "يرقاتشيف (Yirgacheffe)",
+          lat: 5.8,
+          lon: 38.25,
+          continent: "أفريقيا",
+          image:
+            "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?q=80&w=1400&auto=format&fit=crop&ixlib=rb-4.0.3&s=8f9c3d9d3f5f6b2b6c7d8e9f0a1b2c3d",
+          production_pct: 10,
+          phone: "phone:00251",
+          description:
+            "قهوة يرقاتشيف الإثيوبية تشتهر بنكهاتها الزهرية والفواكهية والحموضة المتوازنة.",
+          buy_link: "https://example.com/coffee/ethiopia-yirgacheffe",
+          video_link: "https://www.youtube.com/embed/_GnANWORnWk",
+        },
+        {
+          id: "et_harar",
+          country: "إثيوبيا",
+          region: "هرر (Harrar)",
+          lat: 9.3,
+          lon: 42.1,
+          continent: "أفريقيا",
+          image:
+            "https://images.unsplash.com/photo-1447078806655-40579c2520d6?q=80&w=1400&auto=format&fit=crop&ixlib=rb-4.0.3&s=769cfa7a1b3d9d6b9d7f8c6a5b4e3a2f",
+          production_pct: 6,
+          phone: "phone:00251",
+          description:
+            "قهوة هرر الإثيوبية ذات النكهة الغنية والشوكولاتية مع لمسات من التوت.",
+          buy_link: "https://example.com/coffee/ethiopia-harrar",
+          video_link: "https://www.youtube.com/embed/_GnANWORnWk",
+        },
+        {
+          id: "br_minas",
+          country: "البرازيل",
+          region: "ميناس جيرايس",
+          lat: -21.5,
+          lon: -45.3,
+          continent: "أمريكا الجنوبية",
+          image:
+            "https://upload.wikimedia.org/wikipedia/commons/c/c5/Roasted_coffee_beans.jpg",
+          production_pct: 35,
+          phone: "phone:0055",
+          description:
+            "البرازيل أكبر منتج للقهوة في العالم، وقهوة ميناس جيرايس معروفة بنكهتها الجوزية المعتدلة.",
+          buy_link: "https://example.com/coffee/brazil-minas",
+          video_link: "https://www.youtube.com/embed/aDbzF6pj0X4",
+        },
+        {
+          id: "co_antioquia",
+          country: "كولومبيا",
+          region: "أنتيوكيا (ميديلين)",
+          lat: 6.2442,
+          lon: -75.5812,
+          continent: "أمريكا الجنوبية",
+          image:
+            "https://upload.wikimedia.org/wikipedia/commons/2/2b/Coffee_Farm_near_Ibiraci_town.jpg",
+          production_pct: 15,
+          phone: "phone:0057",
+          description:
+            "قهوة كولومبيا من منطقة أنتيوكيا تتميز بحموضة لطيفة ونكهة متوازنة.",
+          buy_link: "https://example.com/coffee/colombia-antioquia",
+          video_link: "https://www.youtube.com/embed/CCOMM84jhZg",
+        },
+        {
+          id: "vn_buon",
+          country: "فيتنام",
+          region: "بوون ما توت",
+          lat: 12.7957,
+          lon: 108.0521,
+          continent: "آسيا",
+          image:
+            "https://upload.wikimedia.org/wikipedia/commons/2/2b/Coffee_Farm_near_Ibiraci_town.jpg",
+          production_pct: 9,
+          phone: "phone:0084",
+          description:
+            "فيتنام ثاني أكبر منتج للقهوة في العالم، تنتج principalmente قهوة روبوستا.",
+          buy_link: "https://example.com/coffee/vietnam-buon",
+          video_link: "https://www.youtube.com/embed/LH6adMz0y6M",
+        },
+        {
+          id: "id_takengon",
+          country: "إندونيسيا",
+          region: "Takengon - Gayo",
+          lat: 4.6175,
+          lon: 96.7971,
+          continent: "آسيا",
+          image:
+            "https://images.unsplash.com/photo-1470337458703-46ad1756a187?q=80&w=1400&auto=format&fit=crop&ixlib=rb-4.0.3&s=a5f6b7c8d9e0f1a2b3c4d5e6f7081928",
+          production_pct: 8,
+          phone: "phone:0062",
+          description:
+            "قهوة سومطرة الإندونيسية من منطقة غايو معروفة بنكهتها الترابية والكاملة الجسم.",
+          buy_link: "https://example.com/coffee/indonesia-gayo",
+          video_link: "https://www.youtube.com/embed/shorts/0cTmoTwXwnQ",
+        },
+        {
+          id: "gt_antigua",
+          country: "غواتيمالا",
+          region: "أنتيغوا",
+          lat: 14.5586,
+          lon: -90.7346,
+          continent: "أمريكا الوسطى",
+          image:
+            "https://upload.wikimedia.org/wikipedia/commons/f/f6/Coffee_Plantation.jpg",
+          production_pct: 3,
+          phone: "phone:00502",
+          description:
+            "قهوة أنتيغوا الغواتيمالية تشتهر بنكهتها الغنية بالشوكولاتة والكاراميل.",
+          buy_link: "https://example.com/coffee/guatemala-antigua",
+          video_link: "https://www.youtube.com/embed/UKA1-sUPtvI",
+        },
+        {
+          id: "cr_tarrazu",
+          country: "كوستاريكا",
+          region: "تارازو",
+          lat: 9.6208,
+          lon: -84.1639,
+          continent: "أمريكا الوسطى",
+          image:
+            "https://upload.wikimedia.org/wikipedia/commons/2/20/Fazenda_Da_Lagoa.jpg",
+          production_pct: 2,
+          phone: "phone:00506",
+          description:
+            "قهوة تارازو الكوستاريكية معروفة بحموضتها البراقة ونكهاتها الفواكهية.",
+          buy_link: "https://example.com/coffee/costa-rica-tarrazu",
+          video_link: "https://www.youtube.com/embed/D2L4uwSoDi8",
+        },
+      ];
+      const MAPBOX_TOKEN =
+        "pk.eyJ1IjoieW91c2Vmc2FlZCIsImEiOiJjbWdqd3pmYjkwbDg1MmpzZ2Z6ajNuOTBuIn0.7udOUcyBq8MmvCZBrFO8dw";
+
+      if (!MAPBOX_TOKEN || MAPBOX_TOKEN.includes("XXXXXXXX")) {
+        console.warn(
+          "ضع Mapbox Access Token في المتغير MAPBOX_TOKEN داخل الملف قبل التشغيل."
+        );
+      }
+      const map = L.map("map", {
+        center: [8, 10],
+        zoom: 2,
+        worldCopyJump: true,
+      });
+      const baseLayers = {
+        "واقعية (Satellite)": L.tileLayer(
+          `https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/{z}/{x}/{y}?access_token=${MAPBOX_TOKEN}`,
+          { tileSize: 512, zoomOffset: -1, attribution: "Tiles © Mapbox" }
+        ),
+        "شوارع (Streets)": L.tileLayer(
+          `https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/{z}/{x}/{y}?access_token=${MAPBOX_TOKEN}`,
+          { tileSize: 512, zoomOffset: -1, attribution: "Tiles © Mapbox" }
+        ),
+        "تضاريس (Outdoors)": L.tileLayer(
+          `https://api.mapbox.com/styles/v1/mapbox/outdoors-v12/tiles/{z}/{x}/{y}?access_token=${MAPBOX_TOKEN}`,
+          { tileSize: 512, zoomOffset: -1, attribution: "Tiles © Mapbox" }
+        ),
+        "داكنة (Dark)": L.tileLayer(
+          `https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/{z}/{x}/{y}?access_token=${MAPBOX_TOKEN}`,
+          { tileSize: 512, zoomOffset: -1, attribution: "Tiles © Mapbox" }
+        ),
+      };
+      baseLayers["شوارع (Streets)"].addTo(map);
+      const continents = {
+        آسيا: "في آسيا تُزرع القهوة خاصة في اليمن، السعودية (جازان)، فيتنام وإندونيسيا — أنماط متعددة بين أرابيكا وروبوستا.",
+        أفريقيا:
+          "إثيوبيا مهد القهوة وتنتج أنواعًا معقدة ونكهة فاكهية/زهورية متميزة. دول أخرى: كينيا، رواندا.",
+        "أمريكا الجنوبية":
+          "البرازيل وكولومبيا هما قمة الإنتاج عالمياً — كميات ضخمة ومتنوعة في النكهة.",
+        "أمريكا الوسطى":
+          "غواتيمالا وكوستاريكا وهندوراس تنتج أجود أنواع الأرابيكا في مناطق جبلية.",
+      };
+      const continentButtons = document.getElementById("continentButtons");
+      const basemapButtons = document.getElementById("basemapButtons");
+      const descBox = document.getElementById("descBox");
+      const resetBtn = document.getElementById("resetBtn");
+      const searchBox = document.getElementById("searchBox");
+      const statsPanel = document.getElementById("statsPanel");
+      const statsBtn = document.getElementById("statsBtn");
+      const compareBtn = document.getElementById("compareBtn");
+      const comparisonPanel = document.getElementById("comparisonPanel");
+      const closeComparison = document.getElementById("closeComparison");
+      const comparisonContent = document.getElementById("comparisonContent");
+      const loader = document.getElementById("loader");
+      const toggleSidebar = document.getElementById("toggleSidebar");
+      let markersLayer = L.layerGroup().addTo(map);
+      let selectedFarms = [];
+      let currentBaseLayer = "شوارع (Streets)";
+      Object.keys(continents).forEach((name) => {
+        const b = document.createElement("button");
+        b.className = "btn";
+        b.textContent = name;
+        b.onclick = () => showContinent(name);
+        continentButtons.appendChild(b);
+      });
+      Object.keys(baseLayers).forEach((name) => {
+        const b = document.createElement("button");
+        b.className = "btn";
+        if (name === currentBaseLayer) b.classList.add("active");
+        b.textContent = name;
+        b.onclick = () => switchBaseLayer(name);
+        basemapButtons.appendChild(b);
+      });
+      const coffeeIcon = L.divIcon({
+        className: "coffee-marker",
+        html: `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="11" fill="#6f4e37"/>
+          <path d="M8 12c0-2.2 1.8-4 4-4v8c-2.2 0-4-1.8-4-4z" fill="#fff" opacity="0.12"/>
+        </svg>`,
+        iconSize: [34, 34],
+        iconAnchor: [17, 34],
+        popupAnchor: [0, -34],
+      });
+      function showContinent(continentName) {
+        showLoader();
+        descBox.innerHTML = `<strong>${continentName}</strong><br/>${continents[continentName]}`;
+        markersLayer.clearLayers();
+        selectedFarms = [];
+        const points = coffeeLocations.filter(
+          (p) => p.continent === continentName
+        );
+        points.forEach((p, idx) => {
+          setTimeout(() => {
+            const marker = L.marker([p.lat, p.lon], { icon: coffeeIcon });
+            marker.addTo(markersLayer);
+            const popupHtml = `
+              <div class="popup-card">
+                <img src="${p.image}" alt="مزرعة قهوة في ${p.region}" loading="lazy" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIwIiBoZWlnaHQ9IjE2MCIgdmlld0JveD0iMCAwIDMyMCAxNjAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjMyMCIgaGVpZ2h0PSIxNjAiIGZpbGw9IiNGRjdGMkYiLz48dGV4dCB4PSIxNjAiIHk9IjgwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOEY2RjRGIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTYiPuaWh+Wtl+WbvuW9kuaAp+i+heWvvOWFizwvdGV4dD48L3N2Zz4='">
+                <div class="popup-title">${p.country} — ${p.region}</div>
+                <div class="popup-sub">${p.description}</div>
+                <div class="popup-sub">${p.phone}</div>
+                <div class="popup-sub">مساهمة تقريبية من الإنتاج: ${p.production_pct}%</div>
+                <div class="progress-wrap">
+                  <div class="progress-label">نسبة الإنتاج (تقديري)</div>
+                  <div class="progress-bar"><div class="progress-fill" data-p="${p.production_pct}"></div></div>
+                </div>
+                <button class="buy-btn" onclick="window.open('${p.buy_link}', '_blank')">🛒 شراء قهوة ${p.region}</button>
+                <button class="video-btn" onclick="window.open('${p.video_link}', '_blank')" style="width: 100%; margin-top: 8px; background-color:#d9534f; color:white;">🎥 مشاهدة فيديو المزرعة</button>
+                <button class="small-btn" onclick="addToComparison('${p.id}')" style="width: 100%; margin-top: 8px;">➕ إضافة للمقارنة</button>
+              </div>
+            `;
+            marker.bindPopup(popupHtml, {
+              maxWidth: 340,
+              className: "fancy-popup",
+            });
+            const el = marker.getElement();
+            if (el) el.classList.add("bouncy");
+            if (idx === 0) {
+              marker.openPopup();
+            }
+            marker.on("popupopen", (e) => {
+              setTimeout(() => {
+                const fill = e.popup
+                  .getElement()
+                  .querySelector(".progress-fill");
+                if (fill) {
+                  let pct = parseFloat(fill.getAttribute("data-p")) || 0;
+                  if (pct > 100) pct = 100;
+                  fill.style.width = Math.min(pct, 100) + "%";
+                }
+              }, 80);
+            });
+          }, idx * 420);
+        });
+        if (points.length) {
+          const bounds = L.latLngBounds(points.map((p) => [p.lat, p.lon]));
+          map.flyToBounds(bounds.pad(0.6), { duration: 1.6 });
+        }
+        updateStats();
+        hideLoader();
+      }
+      function switchBaseLayer(name) {
+        Object.values(baseLayers).forEach((layer) => {
+          if (map.hasLayer(layer)) map.removeLayer(layer);
+        });
+        baseLayers[name].addTo(map);
+        currentBaseLayer = name;
+        document.querySelectorAll("#basemapButtons .btn").forEach((btn) => {
+          btn.classList.remove("active");
+        });
+        event.target.classList.add("active");
+        if (!map.hasLayer(markersLayer)) markersLayer.addTo(map);
+      }
+      resetBtn.onclick = () => {
+        map.setView([8, 10], 2);
+        markersLayer.clearLayers();
+        descBox.innerHTML = "اختر قارة أو نقطة لعرض معلومات مفصلة.";
+        selectedFarms = [];
+        updateStats();
+      };
+      searchBox.addEventListener("input", function () {
+        const searchTerm = this.value.toLowerCase();
+        if (searchTerm.length < 2) return;
+        const results = coffeeLocations.filter(
+          (location) =>
+            location.country.toLowerCase().includes(searchTerm) ||
+            location.region.toLowerCase().includes(searchTerm) ||
+            location.continent.toLowerCase().includes(searchTerm)
+        );
+        if (results.length > 0) {
+          markersLayer.clearLayers();
+          results.forEach((location) => {
+            const marker = L.marker([location.lat, location.lon], {
+              icon: coffeeIcon,
+            });
+            marker.addTo(markersLayer);
+            const popupHtml = `
+              <div class="popup-card">
+                <img src="${location.image}" alt="مزرعة قهوة في ${location.region}" loading="lazy" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIwIiBoZWlnaHQ9IjE2MCIgdmlld0JveD0iMCAwIDMyMCAxNjAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjMyMCIgaGVpZ2h0PSIxNjAiIGZpbGw9IiNGRjdGMkYiLz48dGV4dCB4PSIxNjAiIHk9IjgwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOEY2RjRGIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTYiPuaWh+Wtl+WbvuW9kuaAp+i+heWvvOWFizwvdGV4dD48L3N2Zz4='">
+                <div class="popup-title">${location.country} — ${location.region}</div>
+                <div class="popup-sub">${location.description}</div>
+                <div class="popup-sub">${location.phone}</div>
+                <div class="popup-sub">مساهمة تقريبية من الإنتاج: ${location.production_pct}%</div>
+                <div class="progress-wrap">
+                  <div class="progress-label">نسبة الإنتاج (تقديري)</div>
+                  <div class="progress-bar"><div class="progress-fill" data-p="${location.production_pct}"></div></div>
+                </div>
+                <button class="buy-btn" onclick="window.open('${location.buy_link}', '_blank')">🛒 شراء قهوة ${location.region}</button>
+                <button class="video-btn" onclick="playVideo('${location.video_link}')" style="width: 100%; margin-top: 8px; background-color:#d9534f; color:white;">🎥 مشاهدة فيديو المزرعة</button>
+                <button class="small-btn" onclick="addToComparison('${location.id}')" style="width: 100%; margin-top: 8px;">➕ إضافة للمقارنة</button>
+              </div>
+            `;
+            marker.bindPopup(popupHtml, {
+              maxWidth: 340,
+              className: "fancy-popup",
+            });
+            marker.on("popupopen", (e) => {
+              setTimeout(() => {
+                const fill = e.popup
+                  .getElement()
+                  .querySelector(".progress-fill");
+                if (fill) {
+                  let pct = parseFloat(fill.getAttribute("data-p")) || 0;
+                  if (pct > 100) pct = 100;
+                  fill.style.width = Math.min(pct, 100) + "%";
+                }
+              }, 80);
+            });
+          });
+          const bounds = L.latLngBounds(
+            results.map((location) => [location.lat, location.lon])
+          );
+          map.flyToBounds(bounds.pad(0.6), { duration: 1.6 });
+        }
+      });
+      function updateStats() {
+        const visibleFarms = markersLayer.getLayers().length;
+        document.getElementById("totalFarms").textContent = visibleFarms;
+        if (visibleFarms > 0) {
+          const farmsData = coffeeLocations.filter((location) =>
+            markersLayer
+              .getLayers()
+              .some(
+                (marker) =>
+                  marker.getLatLng().lat === location.lat &&
+                  marker.getLatLng().lng === location.lon
+              )
+          );
+          if (farmsData.length > 0) {
+            const topProducer = farmsData.reduce((prev, current) =>
+              prev.production_pct > current.production_pct ? prev : current
+            );
+            document.getElementById(
+              "topProducer"
+            ).textContent = `${topProducer.region} (${topProducer.production_pct}%)`;
+
+            const avgProduction =
+              farmsData.reduce((sum, farm) => sum + farm.production_pct, 0) /
+              farmsData.length;
+            document.getElementById(
+              "avgProduction"
+            ).textContent = `${avgProduction.toFixed(1)}%`;
+          }
+        } else {
+          document.getElementById("topProducer").textContent = "-";
+          document.getElementById("avgProduction").textContent = "0%";
+        }
+      }
+      statsBtn.onclick = () => {
+        if (statsPanel.style.display === "block") {
+          statsPanel.style.display = "none";
+          statsBtn.textContent = "📈 عرض الإحصائيات";
+        } else {
+          statsPanel.style.display = "block";
+          statsBtn.textContent = "📊 إخفاء الإحصائيات";
+          updateStats();
+        }
+      };
+      function addToComparison(farmId) {
+        const farm = coffeeLocations.find((f) => f.id === farmId);
+        if (farm && !selectedFarms.some((f) => f.id === farmId)) {
+          selectedFarms.push(farm);
+          updateComparisonPanel();
+        }
+      }
+      function toggleVideo(id, videoLink) {
+        const container = document.getElementById(`video-${id}`);
+        const iframe = container.querySelector("iframe");
+        if (container.style.display === "none") {
+          let embedLink = videoLink;
+          if (videoLink.includes("youtu.be")) {
+            const videoId = videoLink.split("youtu.be/")[1].split("?")[0];
+            embedLink = `https://www.youtube.com/embed/${videoId}`;
+          } else if (videoLink.includes("watch?v=")) {
+            const videoId = videoLink.split("v=")[1].split("&")[0];
+            embedLink = `https://www.youtube.com/embed/${videoId}`;
+          }
+          iframe.src = embedLink;
+          container.style.display = "block";
+        } else {
+          iframe.src = "";
+          container.style.display = "none";
+        }
+      }
+      function updateComparisonPanel() {
+        if (selectedFarms.length === 0) {
+          comparisonContent.innerHTML =
+            "<p>لم تقم بإضافة أي مزارع للمقارنة بعد.</p>";
+          return;
+        }
+        let html = "";
+        selectedFarms.forEach((farm) => {
+          html += `
+            <div class="comparison-item">
+              <div><strong>${farm.country} - ${farm.region}</strong></div>
+              <div>الإنتاج: ${farm.production_pct}%</div>
+              <button class="small-btn" onclick="removeFromComparison('${farm.id}')">إزالة</button>
+            </div>
+          `;
+        });
+        comparisonContent.innerHTML = html;
+        if (selectedFarms.length > 0) {
+          comparisonPanel.style.display = "block";
+        }
+      }
+      function removeFromComparison(farmId) {
+        selectedFarms = selectedFarms.filter((f) => f.id !== farmId);
+        updateComparisonPanel();
+      }
+      compareBtn.onclick = () => {
+        if (comparisonPanel.style.display === "block") {
+          comparisonPanel.style.display = "none";
+        } else {
+          comparisonPanel.style.display = "block";
+          updateComparisonPanel();
+        }
+      };
+      closeComparison.onclick = () => {
+        comparisonPanel.style.display = "none";
+      };
+      function showLoader() {
+        loader.style.display = "block";
+      }
+      function hideLoader() {
+        loader.style.display = "none";
+      }
+      toggleSidebar.onclick = () => {
+        document.getElementById("sidebar").classList.toggle("collapsed");
+      };
+      map.on("click", () => {
+        map.closePopup();
+      });
+      updateStats();
+    </script>
+  </body>
+</html>
